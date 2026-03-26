@@ -1,5 +1,10 @@
 use zeroize::Zeroize;
 
+use argon2::{
+    password_hash::{PasswordHasher, SaltString},
+    Argon2,
+};
+
 /// P1-02: ChainedEngine Data Structure
 /// A secure data container for the algorithm's state.
 #[derive(Zeroize)]
@@ -91,5 +96,28 @@ impl ChainedEngine {
         self.lcg_state = self.lcg_state ^ (ciphertext as u64);
 
         plaintext
+    }
+
+    /// P2-01: Argon2id Integration
+    /// Stretches a passkey into a cryptographically strong seed.
+    pub fn derive_argon2_seed(passkey: &str, salt: &[u8; 16]) -> u64 {
+        // 1. Initialize Argon2id with default parameters
+        let argon2 = Argon2::default();
+        
+        // 2. Wrap the salt in the required SaltString format
+        // For simplicity in this phase, we convert the bytes to a SaltString
+        let salt_string = SaltString::encode_b64(salt).expect("Salt encoding failed");
+
+        // 3. Hash the password
+        let password_hash = argon2
+            .hash_password(passkey.as_bytes(), &salt_string)
+            .expect("Argon2 hashing failed")
+            .hash
+            .expect("Hash output missing");
+
+        // 4. Map the first 8 bytes of the output to a u64 for the LCG seed
+        let mut seed_bytes = [0u8; 8];
+        seed_bytes.copy_from_slice(&password_hash.as_bytes()[0..8]);
+        u64::from_le_bytes(seed_bytes)
     }
 }

@@ -38,7 +38,9 @@ mod engine_tests {
     #[test]
     fn test_encryption_decryption_round_trip() {
         let passkey = "Zie_Cryption_2026";
-        let seed = ChainedEngine::derive_polynomial_hash(passkey);
+        let salt = [0u8; 16]; // In P2-02, this will be randomly generated and saved in the file header
+        let seed = ChainedEngine::derive_argon2_seed(passkey, &salt);
+        let mut engine = ChainedEngine::new(seed, nonce);
         let nonce = [0u8; 12];
         let message = b"Confidential Thesis Data"; // Byte representation of string
 
