@@ -1,11 +1,12 @@
 pub mod engine;
 pub mod format;
-
+pub mod vault;
 
 #[cfg(test)]
 mod engine_tests {
     use crate::engine::ChainedEngine;
     use crate::format::CryptionHeader;
+    use crate::vault::Vault;
 
     /// P1-03: Verifies that the same passkey always produces the same seed.
     /// This ensures the polynomial rolling hash is deterministic.
@@ -67,21 +68,6 @@ mod engine_tests {
 
     #[test]
     fn test_header_serialization() {
-        use crate::engine::CryptionHeader;
-        let original = CryptionHeader {
-            version: 2, 
-            salt: [1u8; 16],
-            nonce: [2u8; 12],
-        };
-        let bytes = original.serialize();
-        let recovered = CryptionHeader::deserialize(&bytes).unwrap();
-        assert_eq!(original.version, recovered.version);
-        assert_eq!(original.salt, recovered.salt);
-        assert_eq!(original.nonce, recovered.nonce);
-    }
-
-    #[test]
-    fn test_header_serialization() {
         // 1. Setup mock data
         let salt = [1u8; 16];
         let nonce = [2u8; 12];
@@ -100,5 +86,27 @@ mod engine_tests {
         assert_eq!(original.version, recovered.version, "Version must match");
         assert_eq!(original.salt, recovered.salt, "Salt must match");
         assert_eq!(original.nonce, recovered.nonce, "Nonce must match");
+    }
+
+    /// P2-03: Verifies that the HMAC layer catches data tampering
+    #[test]
+    fn test_hmac_integrity() {
+        let auth_key = b"super_secret_authentication_key";
+        let valid_file_data = b"CRYP\x02\x00...pretend_this_is_header_and_ciphertext...";
+        
+        // 1. Calculate the MAC for our valid file
+        let valid_mac = Vault::calculate_mac(auth_key, valid_file_data);
+        
+        // 2. Verification should pass for the exact same data
+        let verify_success = Vault::verify_mac(auth_key, valid_file_data, &valid_mac);
+        assert!(verify_success.is_ok(), "MAC verification should pass for untampered data");
+
+        // 3. Simulate an attacker tampering with the file (changing one byte)
+        let mut tampered_file_data = valid_file_data.to_vec();
+        tampered_file_data[10] = b'X'; 
+        
+        // 4. Verification MUST fail for the tampered data
+        let verify_fail = Vault::verify_mac(auth_key, &tampered_file_data, &valid_mac);
+        assert!(verify_fail.is_err(), "MAC verification MUST fail if data is altered");
     }
 }
