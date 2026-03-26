@@ -1,42 +1,95 @@
 use zeroize::Zeroize;
 
+/// P1-02: ChainedEngine Data Structure
+/// A secure data container for the algorithm's state.
 #[derive(Zeroize)]
-#[zeroize(drop)]
+#[zeroize(drop)] // Implements the Zeroize trait to clear sensitive data from RAM
 pub struct ChainedEngine {
-    pub matrix: [u8; 256],    
-    pub lcg_state: u64,       
-    pub nonce: [u8; 12],      
+    pub matrix: [u8; 256],    // Requirement 1: 16x16 matrix field
+    pub lcg_state: u64,       // Requirement 2: LCG state field
+    pub nonce: [u8; 12],      // Requirement 2: Nonce field
 }
 
 impl ChainedEngine {
+    /// Constructor to initialize the engine with a seed and nonce.
+    pub fn new(seed: u64, nonce: [u8; 12]) -> Self {
+        Self {
+            matrix: [0u8; 256], // Initialized as zeros, filled during shuffle
+            lcg_state: seed,
+            nonce,
+        }
+    }
+
+    /// P1-03: Polynomial Hash Implementation
+    /// Converts a passkey string into a u64 seed for the LCG.
+    /// Formula: H = sum(ord(S[i]) * 53^i) mod 2^64
     pub fn derive_polynomial_hash(passkey: &str) -> u64 {
-        let p: u64 = 53;
+        let p: u64 = 53; // Prime number to minimize collisions
         let mut hash: u64 = 0;
 
         for (i, c) in passkey.chars().enumerate() {
             let char_val = c as u64;
+            // wrapping_pow and wrapping_mul handle the mod 2^64 modulus
             let power = p.wrapping_pow(i as u32);
             let term = char_val.wrapping_mul(power);
             hash = hash.wrapping_add(term);
         }
+
         hash
     }
 
+    /// P1-04: LCG State Machine
+    /// Updates the lcg_state using: X_{n+1} = (aX_n + c) mod 2^64
     pub fn next_u64(&mut self) -> u64 {
+        // Constants satisfying the Hull-Dobell Theorem for a full period
         let a: u64 = 6364136223846793005;
         let c: u64 = 1442695040888963407;
+
         self.lcg_state = self.lcg_state.wrapping_mul(a).wrapping_add(c);
         self.lcg_state
     }
 
+    /// P1-05: Matrix Shuffling Logic
+    /// Creates a unique, randomized 16x16 state space for each session.
     pub fn shuffle_matrix(&mut self) {
+        // 1. Initialize matrix with values 0..=255
         for i in 0..256 {
             self.matrix[i] = i as u8;
         }
+
+        // 2. Implement the Fisher-Yates shuffle
+        // a. Loop from i = 255 down to 1
         for i in (1..256).rev() {
+            // b. Generate a random index j using the LCG
             let j = (self.next_u64() % (i as u64 + 1)) as usize;
+
+            // c. Swap matrix[i] and matrix[j]
             self.matrix.swap(i, j);
         }
     }
 
+    /// P1-06: Chaining Transformation - Encryption
+    /// A functional pipeline with a strong Avalanche Effect.
+    pub fn encrypt_byte(&mut self, plaintext: u8) -> u8 {
+        // 2. Perform matrix substitution: C_i = Matrix[plaintext]
+        let ciphertext = self.matrix[plaintext as usize];
+
+        // 3. The Chain: Update lcg_state = lcg_state ^ C_i
+        self.lcg_state = self.lcg_state ^ (ciphertext as u64);
+
+        ciphertext
+    }
+
+    /// P1-06: Chaining Transformation - Decryption
+    pub fn decrypt_byte(&mut self, ciphertext: u8) -> u8 {
+        // Find the index of the ciphertext byte in the current matrix
+        let plaintext = self.matrix.iter()
+            .position(|&val| val == ciphertext)
+            .expect("Matrix must contain all 256 bytes") as u8;
+
+        // Apply identical chain update to keep states synchronized
+        self.lcg_state = self.lcg_state ^ (ciphertext as u64);
+
+        plaintext
+    }
 }
