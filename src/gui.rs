@@ -72,7 +72,8 @@ impl CryptionApp {
 
                     match CryptionManager::encrypt_file(&input_path, &output_path, &self.password) {
                         Ok(_) => self.status_message = Some(format!("✅ Encrypted successfully:\n{}", output_path)),
-                        Err(e) => self.status_message = Some(format!("❌ Error: {}", e)),
+                        // This automatically formats our CryptionError cleanly!
+                        Err(e) => self.status_message = Some(format!("❌ Error: {}", e)), 
                     }
                 } else {
                     self.status_message = Some("⚠️ Please drop a file first.".into());
@@ -98,6 +99,7 @@ impl CryptionApp {
 
                     match CryptionManager::decrypt_file(&input_path, &output_path, &self.password) {
                         Ok(_) => self.status_message = Some(format!("🔓 Decrypted successfully:\n{}", output_path)),
+                        // This automatically formats our CryptionError cleanly!
                         Err(e) => self.status_message = Some(format!("❌ Error: {}", e)),
                     }
                 } else {

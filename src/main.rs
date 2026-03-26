@@ -56,21 +56,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         None => {
-            println!("No command provided. Launching GUI...");
-            gui::run_app()?;
+            println!("🚀 No command provided. Launching Cryption Desktop Environment...");
+            // Safely map the specific iced::Error into our generic Boxed error
+            gui::run_app().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         }   
         Some(Commands::File { encrypt, decrypt, file, passkey, output }) => {
             if encrypt {
                 println!("🔒 Encrypting file: {}...", file);
                 match CryptionManager::encrypt_file(&file, &output, &passkey) {
                     Ok(_) => println!("✅ Encryption complete! Saved to: {}", output),
-                    Err(e) => eprintln!("❌ Error: {}", e),
+                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
             } else if decrypt {
                 println!("🔓 Decrypting file: {}...", file);
                 match CryptionManager::decrypt_file(&file, &output, &passkey) {
                     Ok(_) => println!("✅ Decryption complete! Saved to: {}", output),
-                    Err(e) => eprintln!("❌ Error: {}", e),
+                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
             }   
         }
@@ -81,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("🔒 Encrypted Text:");
                         println!("{}", ciphertext);
                     },
-                    Err(e) => eprintln!("❌ Error: {}", e),
+                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
             } else if decrypt {
                 match CryptionManager::decrypt_text(&text, &passkey) {
@@ -89,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("🔓 Decrypted Text:");
                         println!("{}", plaintext);
                     },
-                    Err(e) => eprintln!("❌ Error: {}", e),
+                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
             } else {
                 eprintln!("❌ Error: Please specify either --encrypt (-e) or --decrypt (-d)");
