@@ -29,4 +29,14 @@ impl ChainedEngine {
         self.lcg_state
     }
 
+    pub fn shuffle_matrix(&mut self) {
+        for i in 0..256 {
+            self.matrix[i] = i as u8;
+        }
+        for i in (1..256).rev() {
+            let j = (self.next_u64() % (i as u64 + 1)) as usize;
+            self.matrix.swap(i, j);
+        }
+    }
+
 }
