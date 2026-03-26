@@ -1,3 +1,5 @@
+mod gui;
+
 use clap::{Parser, Subcommand};
 use cryption::manager::CryptionManager;
 
@@ -6,7 +8,7 @@ use cryption::manager::CryptionManager;
 #[command(about = "A high-performance encryption tool built in Rust", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -49,11 +51,15 @@ enum Commands {
     },
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::File { encrypt, decrypt, file, passkey, output } => {
+        None => {
+            println!("No command provided. Launching GUI...");
+            gui::run_app()?;
+        }   
+        Some(Commands::File { encrypt, decrypt, file, passkey, output }) => {
             if encrypt {
                 println!("🔒 Encrypting file: {}...", file);
                 match CryptionManager::encrypt_file(&file, &output, &passkey) {
@@ -66,9 +72,9 @@ fn main() {
                     Ok(_) => println!("✅ Decryption complete! Saved to: {}", output),
                     Err(e) => eprintln!("❌ Error: {}", e),
                 }
-            }
+            }   
         }
-        Commands::Text { encrypt, decrypt, text, passkey } => { 
+        Some(Commands::Text { encrypt, decrypt, text, passkey }) => { 
             if encrypt {
                 match CryptionManager::encrypt_text(&text, &passkey) {
                     Ok(ciphertext) => {
@@ -90,4 +96,5 @@ fn main() {
             }
         }
     }
+    Ok(())
 }
