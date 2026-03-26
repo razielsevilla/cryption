@@ -1,0 +1,13 @@
+[package]
+name = "Cryption"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# For wiping keys and the matrix from RAM after use
+zeroize = { version = "1.7", features = ["derive"] }
+# For industry-standard key stretching (Argon2id)
+argon2 = "0.5"
+# For integrity checks
+sha2 = "0.10"
+hmac = "0.12"
