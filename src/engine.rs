@@ -121,3 +121,56 @@ impl ChainedEngine {
         u64::from_le_bytes(seed_bytes)
     }
 }
+
+// Constants defined by the CryptionFormat spec
+pub const MAGIC_BYTES: &[u8; 4] = b"CRYP";
+pub const HEADER_SIZE: usize = 34; // Sum of Magic(4) + Version(2) + Salt(16) + Nonce(12)
+
+pub struct CryptionHeader {
+    pub version: u16,
+    pub salt: [u8; 16],
+    pub nonce: [u8; 12],
+}
+
+impl CryptionHeader {
+    /// Requirement 2: Writes the header to a 34-byte array for file storage.
+    pub fn serialize(&self) -> [u8; HEADER_SIZE] {
+        let mut buffer = [0u8; HEADER_SIZE];
+
+        // Offset 0: Magic Bytes (4 bytes)
+        buffer[0..4].copy_from_slice(MAGIC_BYTES);
+
+        // Offset 4: Version Number (2 bytes, Little Endian)
+        let v_bytes = self.version.to_le_bytes();
+        buffer[4..6].copy_from_slice(&v_bytes);
+
+        // Offset 6: Argon2id Salt (16 bytes)
+        buffer[6..22].copy_from_slice(&self.salt);
+
+        // Offset 22: Session Nonce (12 bytes)
+        buffer[22..34].copy_from_slice(&self.nonce);
+
+        buffer
+    }
+
+    /// Requirement 2: Reads the header from a byte stream to recover session metadata.
+    pub fn deserialize(bytes: &[u8; HEADER_SIZE]) -> Result<Self, String> {
+        // Verify Magic Bytes
+        if &bytes[0..4] != MAGIC_BYTES {
+            return Err("Invalid file: Magic bytes 'CRYP' not found".into());
+        }
+
+        // Extract Version
+        let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+
+        // Extract Salt
+        let mut salt = [0u8; 16];
+        salt.copy_from_slice(&bytes[6..22]);
+
+        // Extract Nonce
+        let mut nonce = [0u8; 12];
+        nonce.copy_from_slice(&bytes[22..34]);
+
+        Ok(Self { version, salt, nonce })
+    }
+}
