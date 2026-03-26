@@ -1,6 +1,8 @@
 pub mod engine;
 pub mod format;
 pub mod vault;
+pub mod file_handler;
+pub mod manager;
 
 #[cfg(test)]
 mod engine_tests {
