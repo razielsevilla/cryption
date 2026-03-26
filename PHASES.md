@@ -28,7 +28,7 @@ In this phase, you wrap the engine in industry-standard protection: **Argon2id**
 
 ### Phase 3: Interface & UX (The CLI and GUI)
 
-This phase transforms your library into a usable application for non-developers.
+This phase transforms the library into a usable application for non-developers.
 
 | ID | Task Name | Step-by-Step Technical Procedure | Expected Outcome |
 | :--- | :--- | :--- | :--- |
@@ -40,10 +40,10 @@ This phase transforms your library into a usable application for non-developers.
 
 ### Phase 4: QA, Auditing & Final Release
 
-The final polish to ensure your project is ready for your professional portfolio.
+The final polish to ensure the project is ready for professional portfolio.
 
 | ID | Task Name | Step-by-Step Technical Procedure | Expected Outcome |
 | :--- | :--- | :--- | :--- |
 | **P4-01** | **Avalanche Effect Testing** | 1. Write a test to encrypt a 100-byte file. <br> 2. Change exactly 1 bit in the key and encrypt again. <br> 3. Calculate the **Hamming Distance**; ensure \>50% of bits changed. | Empirical proof that the "Chained" logic is cryptographically sound. |
 | **P4-02** | **Integrity Stress Test** | 1. Encrypt a file to `.cryp`. <br> 2. Use a hex editor to change one byte in the ciphertext. <br> 3. Attempt decryption; verify the system catches the HMAC failure. | Verification that the "Tamper Resistance" layer is working. |
-| **P4-03** | **Documentation & Release** | 1. Finalize `DESIGN.md` and `ALGORITHM.md` with your Rust findings. <br> 2. Create a GitHub Release. <br> 3. Include compiled binaries for Windows/Linux. | A complete, high-impact project for your resume and portfolio. |
+| **P4-03** | **Documentation & Release** | 1. Finalize `DESIGN.md` and `ALGORITHM.md` with the Rust findings. <br> 2. Create a GitHub Release. <br> 3. Include compiled binaries for Windows/Linux. | A complete, high-impact project for resume and portfolio. |
