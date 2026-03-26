@@ -51,26 +51,25 @@ impl CryptionManager {
         Ok(())
     }
 
-    /// Orchestrates the Decryption and Verification pipeline.
     pub fn decrypt_file(input_path: &str, output_path: &str, passkey: &str) -> Result<(), String> {
-        // 1. Extract and parse the Header to get the salt for Argon2
+        // 1. Extract and parse the Header
         let mut in_file = File::open(input_path).map_err(|e| e.to_string())?;
         let mut header_bytes = [0u8; CryptionHeader::SIZE];
-        in_file.read_exact(&mut header_bytes).map_err(|_| "Failed to read header. File may be too small or corrupted.")?;
+        in_file.read_exact(&mut header_bytes).map_err(|_| "Failed to read header.")?;
         let header = CryptionHeader::from_bytes(&header_bytes)?;
 
-        // 2. Derive independent keys
+        // 2. Derive keys and 3. Verify HMAC
         let (seed, mac_key) = ChainedEngine::derive_argon2_keys(passkey, &header.salt);
-
-        // 3. Verify HMAC via streaming, preventing full-file memory load or tampering mid-decryption
         Vault::verify_mac_from_file(&mac_key, input_path)?;
 
-        // 4. Initialize the Engine with recovered Seed and Nonce
+        // 4. Initialize the Engine
         let mut engine = ChainedEngine::new(seed, header.nonce);
         engine.shuffle_matrix();
 
-        // 5. Stream the ciphertext through the decryption engine directly from the input file
-        // We calculate the exact payload size to avoid processing the HMAC signature as cipher data
+        // FIX: Create the output file here to ensure it exists and is empty before decryption.
+        File::create(output_path).map_err(|e| e.to_string())?;
+
+        // 5. Stream the ciphertext through the decryption engine
         let file_size = in_file.metadata().map_err(|e| e.to_string())?.len();
         let payload_size = file_size - CryptionHeader::SIZE as u64 - 32;
 

@@ -23,7 +23,10 @@ impl FileHandler {
         let mut reader = BufReader::new(input_file);
 
         // 2. Create the output file and wrap it in a BufWriter
-        let output_file = OpenOptions::new().append(true).open(output_path)?;
+let output_file = OpenOptions::new()
+            .append(true)
+            .create(true) 
+            .open(output_path)?;
         let mut writer = BufWriter::new(output_file);
 
         // 3. Define our 4KB chunk buffer (4096 bytes)
