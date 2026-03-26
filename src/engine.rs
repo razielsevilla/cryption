@@ -9,8 +9,6 @@ pub struct ChainedEngine {
 }
 
 impl ChainedEngine {
-    /// P1-03: Polynomial Hash Implementation
-    /// Converts a passkey string into a u64 seed for the LCG.
     pub fn derive_polynomial_hash(passkey: &str) -> u64 {
         let p: u64 = 53;
         let mut hash: u64 = 0;
@@ -21,7 +19,14 @@ impl ChainedEngine {
             let term = char_val.wrapping_mul(power);
             hash = hash.wrapping_add(term);
         }
-
         hash
     }
+
+    pub fn next_u64(&mut self) -> u64 {
+        let a: u64 = 6364136223846793005;
+        let c: u64 = 1442695040888963407;
+        self.lcg_state = self.lcg_state.wrapping_mul(a).wrapping_add(c);
+        self.lcg_state
+    }
+
 }
