@@ -15,7 +15,15 @@ pub struct CryptionManager;
 
 impl CryptionManager {
     /// Orchestrates the full Encrypt-then-MAC pipeline.
-    pub fn encrypt_file(input_path: &str, output_path: &str, passkey: &str) -> Result<(), CryptionError> {
+    pub fn encrypt_file<F>(
+        input_path: &str, 
+        output_path: &str, 
+        passkey: &str,
+        progress_callback: Option<F>
+    ) -> Result<(), CryptionError>
+    where
+        F: FnMut(u64),
+    {
         // 1. Generate secure random Salt and Nonce
         let mut salt = [0u8; 16];
         let mut nonce = [0u8; 12];
@@ -38,7 +46,7 @@ impl CryptionManager {
         drop(out_file); 
 
         // 4. Stream the file through the Engine
-        FileHandler::process_file(input_path, output_path, &mut engine, true, 0, None)?;
+        FileHandler::process_file(input_path, output_path, &mut engine, true, 0, None, progress_callback)?;
 
         // 5. Encrypt-then-MAC: Calculate HMAC over the entire resulting file using streaming
         let mac_signature = Vault::calculate_mac_from_file(&mac_key, output_path)
@@ -54,7 +62,15 @@ impl CryptionManager {
         Ok(())
     }
 
-    pub fn decrypt_file(input_path: &str, output_path: &str, passkey: &str) -> Result<(), CryptionError> {
+    pub fn decrypt_file<F>(
+        input_path: &str, 
+        output_path: &str, 
+        passkey: &str,
+        progress_callback: Option<F>
+    ) -> Result<(), CryptionError>
+    where
+        F: FnMut(u64),
+    {
         // 1. Extract and parse the Header
         let mut in_file = File::open(input_path)?;
         let mut header_bytes = [0u8; CryptionHeader::SIZE];
@@ -88,7 +104,8 @@ impl CryptionManager {
             &mut engine,
             false,
             CryptionHeader::SIZE as u64,
-            Some(payload_size)
+            Some(payload_size),
+            progress_callback
         )?;
 
         Ok(())

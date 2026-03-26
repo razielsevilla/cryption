@@ -70,7 +70,7 @@ impl CryptionApp {
                     let input_path = path.to_string_lossy().to_string();
                     let output_path = format!("{}.cryp", input_path);
 
-                    match CryptionManager::encrypt_file(&input_path, &output_path, &self.password) {
+                    match CryptionManager::encrypt_file(&input_path, &output_path, &self.password, None::<fn(u64)>) {
                         Ok(_) => self.status_message = Some(format!("✅ Encrypted successfully:\n{}", output_path)),
                         // This automatically formats our CryptionError cleanly!
                         Err(e) => self.status_message = Some(format!("❌ Error: {}", e)), 
@@ -97,7 +97,7 @@ impl CryptionApp {
                         format!("{}.decrypted", input_path)
                     };
 
-                    match CryptionManager::decrypt_file(&input_path, &output_path, &self.password) {
+                    match CryptionManager::decrypt_file(&input_path, &output_path, &self.password, None::<fn(u64)>) {
                         Ok(_) => self.status_message = Some(format!("🔓 Decrypted successfully:\n{}", output_path)),
                         // This automatically formats our CryptionError cleanly!
                         Err(e) => self.status_message = Some(format!("❌ Error: {}", e)),

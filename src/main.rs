@@ -63,13 +63,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(Commands::File { encrypt, decrypt, file, passkey, output }) => {
             if encrypt {
                 println!("🔒 Encrypting file: {}...", file);
-                match CryptionManager::encrypt_file(&file, &output, &passkey) {
+                match CryptionManager::encrypt_file(&file, &output, &passkey, None::<fn(u64)>) {
                     Ok(_) => println!("✅ Encryption complete! Saved to: {}", output),
                     Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
             } else if decrypt {
                 println!("🔓 Decrypting file: {}...", file);
-                match CryptionManager::decrypt_file(&file, &output, &passkey) {
+                match CryptionManager::decrypt_file(&file, &output, &passkey, None::<fn(u64)>) {
                     Ok(_) => println!("✅ Decryption complete! Saved to: {}", output),
                     Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
                 }
