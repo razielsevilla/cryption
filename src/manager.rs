@@ -8,6 +8,8 @@ use crate::format::CryptionHeader;
 use crate::vault::Vault;
 use crate::file_handler::FileHandler;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
 pub struct CryptionManager;
 
 impl CryptionManager {
@@ -83,5 +85,77 @@ impl CryptionManager {
         ).map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+
+    /// Encrypts a raw string and returns a Base64 encoded payload
+    pub fn encrypt_text(text: &str, passkey: &str) -> Result<String, String> {
+        // 1. Generate secure random Salt and Nonce
+        let mut salt = [0u8; 16];
+        let mut nonce = [0u8; 12];
+        OsRng.fill_bytes(&mut salt);
+        OsRng.fill_bytes(&mut nonce);
+
+        // 2. Initialize the Cryptographic Engine
+        let (seed, mac_key) = ChainedEngine::derive_argon2_keys(passkey, &salt);
+        let mut engine = ChainedEngine::new(seed, nonce);
+        engine.shuffle_matrix();
+
+        // 3. Create Header and initialize the payload buffer
+        let header = CryptionHeader::new(salt, nonce);
+        let mut payload = header.to_bytes().to_vec();
+
+        // 4. Encrypt the text bytes
+        for &byte in text.as_bytes() {
+            payload.push(engine.encrypt_byte(byte));
+        }
+
+        // 5. Encrypt-then-MAC: Calculate HMAC over the header + ciphertext
+        let mac_signature = Vault::calculate_mac(&mac_key, &payload);
+        
+        // 6. Append the MAC and encode to Base64
+        payload.extend_from_slice(&mac_signature);
+        Ok(STANDARD.encode(payload))
+    }
+
+    /// Decrypts a Base64 encoded payload back into a UTF-8 string
+    pub fn decrypt_text(base64_text: &str, passkey: &str) -> Result<String, String> {
+        // 1. Decode Base64 back to raw bytes
+        let payload = STANDARD.decode(base64_text)
+            .map_err(|_| "Invalid Base64 format.")?;
+
+        if payload.len() < CryptionHeader::SIZE + 32 {
+            return Err("Payload too small to be valid.".into());
+        }
+
+        // 2. Extract and parse the Header
+        let (header_bytes, _) = payload.split_at(CryptionHeader::SIZE);
+        let header = CryptionHeader::from_bytes(header_bytes)?;
+
+        // 3. Derive keys
+        let (seed, mac_key) = ChainedEngine::derive_argon2_keys(passkey, &header.salt);
+
+        // 4. Verify MAC against the data (Header + Ciphertext)
+        let mac_start = payload.len() - 32;
+        let (data_to_verify, expected_mac) = payload.split_at(mac_start);
+        
+        let mut mac_array = [0u8; 32];
+        mac_array.copy_from_slice(expected_mac);
+        Vault::verify_mac(&mac_key, data_to_verify, &mac_array)?;
+
+        // 5. Initialize the Engine
+        let mut engine = ChainedEngine::new(seed, header.nonce);
+        engine.shuffle_matrix();
+
+        // 6. Decrypt the ciphertext
+        let ciphertext = &data_to_verify[CryptionHeader::SIZE..];
+        let mut decrypted_bytes = Vec::with_capacity(ciphertext.len());
+
+        for &byte in ciphertext {
+            decrypted_bytes.push(engine.decrypt_byte(byte));
+        }
+
+        // 7. Convert back to a String
+        String::from_utf8(decrypted_bytes)
+            .map_err(|_| "Decrypted data is not valid UTF-8.".into())
     }
 }

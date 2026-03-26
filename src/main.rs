@@ -68,8 +68,26 @@ fn main() {
                 }
             }
         }
-        Commands::Text { .. } => { 
-            println!("🛠️ Text Mode is currently in development.");
+        Commands::Text { encrypt, decrypt, text, passkey } => { 
+            if encrypt {
+                match CryptionManager::encrypt_text(&text, &passkey) {
+                    Ok(ciphertext) => {
+                        println!("🔒 Encrypted Text:");
+                        println!("{}", ciphertext);
+                    },
+                    Err(e) => eprintln!("❌ Error: {}", e),
+                }
+            } else if decrypt {
+                match CryptionManager::decrypt_text(&text, &passkey) {
+                    Ok(plaintext) => {
+                        println!("🔓 Decrypted Text:");
+                        println!("{}", plaintext);
+                    },
+                    Err(e) => eprintln!("❌ Error: {}", e),
+                }
+            } else {
+                eprintln!("❌ Error: Please specify either --encrypt (-e) or --decrypt (-d)");
+            }
         }
     }
 }
