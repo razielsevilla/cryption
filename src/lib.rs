@@ -14,3 +14,16 @@ mod tests {
         assert_eq!(result, 4);
     }
 }
+
+#[cfg(test)]
+mod engine_tests {
+    use crate::engine::ChainedEngine;
+
+    #[test]
+    fn test_polynomial_hash_consistency() {
+        let key = "secure_password";
+        let hash1 = ChainedEngine::derive_polynomial_hash(key);
+        let hash2 = ChainedEngine::derive_polynomial_hash(key);
+        assert_eq!(hash1, hash2);
+    }
+}

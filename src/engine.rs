@@ -1,13 +1,27 @@
 use zeroize::Zeroize;
 
-// Requirement 3: Implement the Zeroize trait to clear sensitive data from RAM
 #[derive(Zeroize)]
-#[zeroize(drop)] // This ensures data is wiped when the struct goes out of scope
+#[zeroize(drop)]
 pub struct ChainedEngine {
-    // Requirement 1: Define a matrix field
     pub matrix: [u8; 256],    
-    
-    // Requirement 2: Add lcg_state and nonce fields
     pub lcg_state: u64,       
     pub nonce: [u8; 12],      
+}
+
+impl ChainedEngine {
+    /// P1-03: Polynomial Hash Implementation
+    /// Converts a passkey string into a u64 seed for the LCG.
+    pub fn derive_polynomial_hash(passkey: &str) -> u64 {
+        let p: u64 = 53;
+        let mut hash: u64 = 0;
+
+        for (i, c) in passkey.chars().enumerate() {
+            let char_val = c as u64;
+            let power = p.wrapping_pow(i as u32);
+            let term = char_val.wrapping_mul(power);
+            hash = hash.wrapping_add(term);
+        }
+
+        hash
+    }
 }
