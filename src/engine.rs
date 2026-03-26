@@ -99,13 +99,12 @@ impl ChainedEngine {
     }
 
     /// P2-01: Argon2id Integration
-    /// Stretches a passkey into a cryptographically strong seed.
-    pub fn derive_argon2_seed(passkey: &str, salt: &[u8; 16]) -> u64 {
+    /// Stretches a passkey into a cryptographically strong seed for LCG and a key for HMAC.
+    pub fn derive_argon2_keys(passkey: &str, salt: &[u8; 16]) -> (u64, [u8; 32]) {
         // 1. Initialize Argon2id with default parameters
         let argon2 = Argon2::default();
         
         // 2. Wrap the salt in the required SaltString format
-        // For simplicity in this phase, we convert the bytes to a SaltString
         let salt_string = SaltString::encode_b64(salt).expect("Salt encoding failed");
 
         // 3. Hash the password
@@ -118,59 +117,12 @@ impl ChainedEngine {
         // 4. Map the first 8 bytes of the output to a u64 for the LCG seed
         let mut seed_bytes = [0u8; 8];
         seed_bytes.copy_from_slice(&password_hash.as_bytes()[0..8]);
-        u64::from_le_bytes(seed_bytes)
-    }
-}
+        let seed = u64::from_le_bytes(seed_bytes);
+        
+        // 5. Use the first 32 bytes of the Argon2 hash as the MAC key
+        let mut mac_key = [0u8; 32];
+        mac_key.copy_from_slice(&password_hash.as_bytes()[0..32]);
 
-// Constants defined by the CryptionFormat spec
-pub const MAGIC_BYTES: &[u8; 4] = b"CRYP";
-pub const HEADER_SIZE: usize = 34; // Sum of Magic(4) + Version(2) + Salt(16) + Nonce(12)
-
-pub struct CryptionHeader {
-    pub version: u16,
-    pub salt: [u8; 16],
-    pub nonce: [u8; 12],
-}
-
-impl CryptionHeader {
-    /// Requirement 2: Writes the header to a 34-byte array for file storage.
-    pub fn serialize(&self) -> [u8; HEADER_SIZE] {
-        let mut buffer = [0u8; HEADER_SIZE];
-
-        // Offset 0: Magic Bytes (4 bytes)
-        buffer[0..4].copy_from_slice(MAGIC_BYTES);
-
-        // Offset 4: Version Number (2 bytes, Little Endian)
-        let v_bytes = self.version.to_le_bytes();
-        buffer[4..6].copy_from_slice(&v_bytes);
-
-        // Offset 6: Argon2id Salt (16 bytes)
-        buffer[6..22].copy_from_slice(&self.salt);
-
-        // Offset 22: Session Nonce (12 bytes)
-        buffer[22..34].copy_from_slice(&self.nonce);
-
-        buffer
-    }
-
-    /// Requirement 2: Reads the header from a byte stream to recover session metadata.
-    pub fn deserialize(bytes: &[u8; HEADER_SIZE]) -> Result<Self, String> {
-        // Verify Magic Bytes
-        if &bytes[0..4] != MAGIC_BYTES {
-            return Err("Invalid file: Magic bytes 'CRYP' not found".into());
-        }
-
-        // Extract Version
-        let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-
-        // Extract Salt
-        let mut salt = [0u8; 16];
-        salt.copy_from_slice(&bytes[6..22]);
-
-        // Extract Nonce
-        let mut nonce = [0u8; 12];
-        nonce.copy_from_slice(&bytes[22..34]);
-
-        Ok(Self { version, salt, nonce })
+        (seed, mac_key)
     }
 }

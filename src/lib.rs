@@ -50,7 +50,7 @@ mod engine_tests {
         let nonce = [0u8; 12]; // Defined before use in the engines below
         
         // P2-01: Key Stretching via Argon2id
-        let seed = ChainedEngine::derive_argon2_seed(passkey, &salt);
+        let (seed, _mac_key) = ChainedEngine::derive_argon2_keys(passkey, &salt);
         let message = b"Confidential Thesis Data";
 
         // 1. Encryption Side

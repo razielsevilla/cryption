@@ -11,3 +11,4 @@ argon2 = "0.5"
 # For integrity checks
 sha2 = "0.10"
 hmac = "0.12"
+rand = { version = "0.8", features = ["getrandom"] }

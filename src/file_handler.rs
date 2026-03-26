@@ -1,22 +1,25 @@
 // src/file_handler.rs
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write, Result};
+use std::io::{BufReader, BufWriter, Read, Write, Result, Seek, SeekFrom};
 use crate::engine::ChainedEngine;
 use std::fs::OpenOptions;
 
 pub struct FileHandler;
 
 impl FileHandler {
-    /// P2-04: Reads an input file in 4KB chunks, processes it through the engine, 
+    /// P2-04: Reads an input file in chunks, processes it through the engine, 
     /// and writes the output to a new file using buffered I/O.
     pub fn process_file(
         input_path: &str,
         output_path: &str,
         engine: &mut ChainedEngine,
         is_encrypting: bool,
+        offset: u64,
+        limit: Option<u64>,
     ) -> Result<()> {
-        // 1. Open the input file and wrap it in a BufReader
-        let input_file = File::open(input_path)?;
+        // 1. Open the input file, seek to offset, and wrap it in a BufReader
+        let mut input_file = File::open(input_path)?;
+        input_file.seek(SeekFrom::Start(offset))?;
         let mut reader = BufReader::new(input_file);
 
         // 2. Create the output file and wrap it in a BufWriter
@@ -25,12 +28,22 @@ impl FileHandler {
 
         // 3. Define our 4KB chunk buffer (4096 bytes)
         let mut buffer = [0u8; 4096];
+        let mut bytes_processed = 0u64;
 
-        // 4. Loop through the file until EOF
+        // 4. Loop through the file
         loop {
-            let bytes_read = reader.read(&mut buffer)?;
+            let to_read = match limit {
+                Some(l) => std::cmp::min(buffer.len() as u64, l - bytes_processed) as usize,
+                None => buffer.len(),
+            };
             
-            // If read returns 0, we've reached the end of the file
+            if to_read == 0 {
+                break;
+            }
+
+            let bytes_read = reader.read(&mut buffer[..to_read])?;
+            
+            // If read returns 0, we've reached the end of the file/stream
             if bytes_read == 0 {
                 break;
             }
@@ -46,6 +59,7 @@ impl FileHandler {
 
             // 6. Write the processed chunk to the BufWriter
             writer.write_all(&buffer[..bytes_read])?;
+            bytes_processed += bytes_read as u64;
         }
 
         // 7. Ensure any remaining bytes in the writer's memory are pushed to the disk
