@@ -18,9 +18,20 @@ pub struct ChainedEngine {
 impl ChainedEngine {
     /// Constructor to initialize the engine with a seed and nonce.
     pub fn new(seed: u64, nonce: [u8; 12]) -> Self {
+        // P2-01: Incorporate the nonce into the initial LCG state.
+        // We use the LCG formula itself to 'absorb' the nonce bytes, 
+        // ensuring even a 1-bit change in the nonce spreads across the entire 64-bit state.
+        let mut initial_state = seed;
+        let a: u64 = 6364136223846793005;
+        let c: u64 = 1442695040888963407;
+
+        for &byte in nonce.iter() {
+            initial_state = initial_state.wrapping_mul(a).wrapping_add(byte as u64).wrapping_add(c);
+        }
+
         Self {
             matrix: [0u8; 256], // Initialized as zeros, filled during shuffle
-            lcg_state: seed,
+            lcg_state: initial_state,
             nonce,
         }
     }
@@ -76,24 +87,33 @@ impl ChainedEngine {
     /// P1-06: Chaining Transformation - Encryption
     /// A functional pipeline with a strong Avalanche Effect.
     pub fn encrypt_byte(&mut self, plaintext: u8) -> u8 {
-        // 2. Perform matrix substitution: C_i = Matrix[plaintext]
-        let ciphertext = self.matrix[plaintext as usize];
+        // 1. Advance LCG to get a dynamic offset for this byte
+        // This ensures identical plaintext bytes result in different ciphertext bytes
+        let offset = self.next_u64() as u8;
 
-        // 3. The Chain: Update lcg_state = lcg_state ^ C_i
-        self.lcg_state = self.lcg_state ^ (ciphertext as u64);
+        // 2. Perform matrix substitution with dynamic offset: C_i = Matrix[plaintext + offset]
+        let ciphertext = self.matrix[plaintext.wrapping_add(offset) as usize];
+
+        // 3. The Chain: Update lcg_state = lcg_state ^ C_i (Requirement P1-06)
+        self.lcg_state ^= ciphertext as u64;
 
         ciphertext
     }
 
     /// P1-06: Chaining Transformation - Decryption
     pub fn decrypt_byte(&mut self, ciphertext: u8) -> u8 {
-        // Find the index of the ciphertext byte in the current matrix
-        let plaintext = self.matrix.iter()
+        // 1. Advance LCG identically to the encryption side
+        let offset = self.next_u64() as u8;
+
+        // 2. Find the index and reverse the dynamic offset
+        let substituted_index = self.matrix.iter()
             .position(|&val| val == ciphertext)
             .expect("Matrix must contain all 256 bytes") as u8;
 
-        // Apply identical chain update to keep states synchronized
-        self.lcg_state = self.lcg_state ^ (ciphertext as u64);
+        let plaintext = substituted_index.wrapping_sub(offset);
+
+        // 3. Update the chain to stay synchronized
+        self.lcg_state ^= ciphertext as u64;
 
         plaintext
     }
