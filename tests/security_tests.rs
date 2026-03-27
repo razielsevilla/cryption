@@ -1,4 +1,7 @@
 use cryption::engine::ChainedEngine;
+use cryption::manager::CryptionManager;
+use cryption::error::CryptionError;
+use std::fs;
 
 /// Calculates the Hamming Distance (number of differing bits) between two slices.
 fn hamming_distance(a: &[u8], b: &[u8]) -> usize {
@@ -68,4 +71,51 @@ fn test_avalanche_effect_nonce_flip() {
 
     // Requirement: Ensure >50% of bits changed
     assert!(distance > bit_count / 2, "Avalanche effect must change >50% of bits (got {} bits, {:.2}%)", distance, percentage);
+}
+
+#[test]
+fn test_integrity_tamper_resistance() {
+    let passkey = "zie_integrity_test_2026";
+    let input_path = "test_integrity.bin";
+    let encrypted_path = "test_integrity.bin.cryp";
+    let decrypted_path = "test_integrity.bin.decrypted";
+
+    // 1. Setup: Create a test file and encrypt it
+    let plaintext = b"This is a secret message that should not be tampered with.";
+    fs::write(input_path, plaintext).unwrap();
+
+    CryptionManager::encrypt_file(input_path, encrypted_path, passkey, None::<fn(u64)>).unwrap();
+
+    // 2. Scenario A: Tamper with a Ciphertext byte (offset 40)
+    let mut encrypted_data = fs::read(encrypted_path).unwrap();
+    encrypted_data[40] ^= 0xFF; // Flip all bits in one byte
+    fs::write(encrypted_path, &encrypted_data).unwrap();
+
+    let result = CryptionManager::decrypt_file(encrypted_path, decrypted_path, passkey, None::<fn(u64)>);
+    assert!(matches!(result, Err(CryptionError::InvalidMAC)), "System must catch ciphertext tampering via HMAC failure");
+
+    // 3. Scenario B: Tamper with a MAC byte (the very last byte)
+    // Re-encrypt to reset ciphertext tamper
+    CryptionManager::encrypt_file(input_path, encrypted_path, passkey, None::<fn(u64)>).unwrap();
+    encrypted_data = fs::read(encrypted_path).unwrap();
+    let last_idx = encrypted_data.len() - 1;
+    encrypted_data[last_idx] ^= 0xFF;
+    fs::write(encrypted_path, &encrypted_data).unwrap();
+
+    let result = CryptionManager::decrypt_file(encrypted_path, decrypted_path, passkey, None::<fn(u64)>);
+    assert!(matches!(result, Err(CryptionError::InvalidMAC)), "System must catch MAC tampering");
+
+    // 4. Scenario C: Tamper with a Header byte (offset 10, within salt/nonce)
+    CryptionManager::encrypt_file(input_path, encrypted_path, passkey, None::<fn(u64)>).unwrap();
+    encrypted_data = fs::read(encrypted_path).unwrap();
+    encrypted_data[10] ^= 0xFF; // Tampering with the salt/nonce should also break HMAC
+    fs::write(encrypted_path, &encrypted_data).unwrap();
+
+    let result = CryptionManager::decrypt_file(encrypted_path, decrypted_path, passkey, None::<fn(u64)>);
+    assert!(matches!(result, Err(CryptionError::InvalidMAC)), "System must catch Header tampering");
+
+    // 5. Cleanup
+    let _ = fs::remove_file(input_path);
+    let _ = fs::remove_file(encrypted_path);
+    let _ = fs::remove_file(decrypted_path);
 }
