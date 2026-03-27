@@ -61,17 +61,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             gui::run_app().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         }   
         Some(Commands::File { encrypt, decrypt, file, passkey, output }) => {
+            use indicatif::{ProgressBar, ProgressStyle};
+            
+            let file_metadata = std::fs::metadata(&file)?;
+            let file_size = file_metadata.len();
+            
+            // P3-03: Initialize the progress bar
+            let pb = ProgressBar::new(file_size);
+            pb.set_style(ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .unwrap()
+                .progress_chars("#>-"));
+
             if encrypt {
                 println!("🔒 Encrypting file: {}...", file);
-                match CryptionManager::encrypt_file(&file, &output, &passkey, None::<fn(u64)>) {
-                    Ok(_) => println!("✅ Encryption complete! Saved to: {}", output),
-                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
+                // When encrypting, we process the whole file (header is added separately but not tracked in the callback)
+                // Actually, manager.rs passes the callback to FileHandler which processes the source file.
+                match CryptionManager::encrypt_file(&file, &output, &passkey, Some(|bytes| pb.set_position(bytes))) {
+                    Ok(_) => {
+                        pb.finish_with_message("Done");
+                        println!("✅ Encryption complete! Saved to: {}", output);
+                    },
+                    Err(e) => {
+                        pb.abandon();
+                        eprintln!("❌ Error: {}", e);
+                    }
                 }
             } else if decrypt {
                 println!("🔓 Decrypting file: {}...", file);
-                match CryptionManager::decrypt_file(&file, &output, &passkey, None::<fn(u64)>) {
-                    Ok(_) => println!("✅ Decryption complete! Saved to: {}", output),
-                    Err(e) => eprintln!("❌ Error: {}", e), // Automatically prints CryptionError format
+                // When decrypting, the payload is slightly smaller than the file size
+                let payload_size = file_size.saturating_sub(34 + 32); // Header(34) + MAC(32)
+                pb.set_length(payload_size);
+
+                match CryptionManager::decrypt_file(&file, &output, &passkey, Some(|bytes| pb.set_position(bytes))) {
+                    Ok(_) => {
+                        pb.finish_with_message("Done");
+                        println!("✅ Decryption complete! Saved to: {}", output);
+                    },
+                    Err(e) => {
+                        pb.abandon();
+                        eprintln!("❌ Error: {}", e);
+                    }
                 }
             }   
         }
