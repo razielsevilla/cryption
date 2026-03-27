@@ -31,13 +31,13 @@ To prevent side-channel attacks, Cryption follows the Encrypt-then-MAC pipeline:
 Designing with **SOLID principles** makes the code easier to test.
 
 ### `ChainedEngine` (The Brain)
-* `generate_matrix(seed)`: Creates the initial $16 \times 16$ state.
-* `shuffle_rounds(n)`: Executes the LCG-driven permutation.
-* `transform(byte_block)`: The core XOR/Substitution logic.
+* `new(seed, nonce)`: Mixing logic ensures unique per-session LCG sequence.
+* `shuffle_matrix()`: Fisher-Yates shuffle randomized by LCG state.
+* `encrypt_byte(plaintext)` / `decrypt_byte(ciphertext)`: Dynamic offset substitution with integrated chaining.
 
 ### `Vault` (The Key Manager)
-* `derive_key(password, salt)`: Handles the KDF logic.
-* `verify_integrity(file_data)`: Checks the HMAC before decryption.
+* `derive_argon2_keys(passkey, salt)`: Key stretching via Argon2id.
+* `calculate_mac(key, data)` / `verify_mac_from_file(key, path)`: Integrity verification.
 
 ### `CryptionFormat` (The File Spec)
 | Offset | Field | Size (Bytes) |
